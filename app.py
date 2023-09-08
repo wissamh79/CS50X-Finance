@@ -170,7 +170,7 @@ def quote():
         if not quote:
             return apology("invalid symbol", 400)
 
-        return render_template("quote.html")
+        return render_template("quote.html", quote=quote)
     else:
 
         return render_template("quote.html")
@@ -269,3 +269,73 @@ def sell():
     # If the user visits the page
     else:
         return render_template("sell.html", stocks=stocks)
+
+
+@app.route("/change_password", methods=["GET", "POST"])
+@login_required  # You can use a login_required decorator to ensure only logged-in users can access this route
+def change_password():
+    if request.method == "POST":
+        # Ensure old password was submitted
+        if not request.form.get("old_password"):
+            return apology("must provide old password", 400)
+
+        # Ensure new password was submitted
+        if not request.form.get("new_password"):
+            return apology("must provide new password", 400)
+
+        # Ensure confirmation of the new password is provided
+        if not request.form.get("confirmation"):
+            return apology("must confirm new password", 400)
+
+        # Ensure the new password and confirmation match
+        if request.form["new_password"] != request.form["confirmation"]:
+            return apology("New passwords do not match", 400)
+
+        # Check if the old password is correct for the current user
+        user_id = session["user_id"]
+        user = db.execute(
+            "SELECT * FROM users WHERE id = :user_id", user_id=user_id)
+        if not check_password_hash(user[0]["hash"], request.form["old_password"]):
+            return apology("Incorrect old password", 400)
+
+        # Update the user's password in the database
+        new_hashed_password = generate_password_hash(
+            request.form["new_password"])
+        db.execute("UPDATE users SET hash = :new_hashed_password WHERE id = :user_id",
+                   new_hashed_password=new_hashed_password, user_id=user_id)
+
+        return redirect("/")
+    else:
+        return render_template("change_password.html")
+
+
+@app.route("/add_cash", methods=["GET", "POST"])
+@login_required  # You can use a login_required decorator to ensure only logged-in users can access this route
+def add_cash():
+    if request.method == "POST":
+        # Ensure the amount was submitted
+        if not request.form.get("amount"):
+            return apology("must provide an amount", 400)
+
+        # Ensure the amount is a positive number
+        try:
+            amount = float(request.form.get("amount"))
+            if amount <= 0:
+                return apology("amount must be a positive number", 400)
+        except ValueError:
+            return apology("invalid amount format", 400)
+
+        # Get the current user's cash balance
+        user_id = session["user_id"]
+        user = db.execute(
+            "SELECT cash FROM users WHERE id = :user_id", user_id=user_id)
+        current_cash = user[0]["cash"]
+
+        # Update the user's cash balance in the database
+        new_cash = current_cash + amount
+        db.execute("UPDATE users SET cash = :new_cash WHERE id = :user_id",
+                   new_cash=new_cash, user_id=user_id)
+
+        return redirect("/")
+    else:
+        return render_template("add_cash.html")
